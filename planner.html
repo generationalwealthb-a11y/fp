@@ -18,25 +18,6 @@
 <meta name="msapplication-tap-highlight" content="no">
 <link rel="manifest" id="pwa-manifest">
 <link rel="apple-touch-icon" id="apple-icon">
-<!-- iPhone splash screens -->
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="apple-touch-startup-image" id="apple-splash">
-<!-- Prevent double-tap zoom on iOS -->
-<style>
-  * { touch-action: manipulation; }
-  /* iOS Safari bottom safe area */
-  .mob-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
-  /* Prevent iOS text size adjustment */
-  html { -webkit-text-size-adjust: 100%; }
-  /* iOS momentum scrolling */
-  .pg, .adv-pg { -webkit-overflow-scrolling: touch; }
-  /* Fix iOS input zoom (keep font-size >= 16px on inputs) */
-  .ain, .fin, .fse, .ni { font-size: 16px !important; }
-  @media (min-width: 400px) {
-    .ain, .fin, .fse { font-size: 14px !important; }
-    .ni { font-size: 13px !important; }
-  }
-</style>
 
 <!-- Safe area insets for iPhone notch / Android nav bar -->
 <style>
@@ -578,7 +559,7 @@ button{cursor:pointer;transition:all .15s}
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 
-<script src="supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script type="module">
 const{createClient}=supabase;
 
@@ -3814,53 +3795,6 @@ window.gwbTogglePw = function() {
     : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
 };
 </script>
-
-<script>
-// ── Service Worker for offline PWA support ──────────────
-if ('serviceWorker' in navigator && !window.Capacitor) {
-  window.addEventListener('load', function() {
-    // Inline service worker as blob URL
-    const swCode = `
-const CACHE = 'gwb-v1';
-const SHELL = ['/'];
-
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL)).then(() => self.skipWaiting()));
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(
-      keys.filter(k => k !== CACHE).map(k => caches.delete(k))
-    )).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', e => {
-  const url = new URL(e.request.url);
-  // Never cache Supabase API calls
-  if (url.hostname.includes('supabase.co') || url.hostname.includes('exchangerate-api.com')) return;
-  // Cache-first for same-origin assets
-  if (url.origin === self.location.origin) {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request).then(res => {
-        const clone = res.clone();
-        caches.open(CACHE).then(c => c.put(e.request, clone));
-        return res;
-      }).catch(() => caches.match('/')))
-    );
-  }
-});
-    `;
-    const blob = new Blob([swCode], {type: 'application/javascript'});
-    const swUrl = URL.createObjectURL(blob);
-    navigator.serviceWorker.register(swUrl)
-      .then(r => console.log('GWB SW registered'))
-      .catch(e => console.warn('GWB SW failed:', e));
-  });
-}
-</script>
-
 </body>
 </html></script>
 <script>
@@ -3889,21 +3823,13 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
     lang: 'en',
     categories: ['finance','productivity'],
     icons: [
-      { src: LOGO_SRC, sizes: '192x192', type: 'image/jpeg', purpose: 'any' },
-      { src: LOGO_SRC, sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
-      { src: LOGO_SRC, sizes: '192x192', type: 'image/jpeg', purpose: 'maskable' }
-    ],
-    screenshots: [],
-    shortcuts: []
+      { src: LOGO_SRC, sizes: '192x192', type: 'image/jpeg', purpose: 'any maskable' },
+      { src: LOGO_SRC, sizes: '512x512', type: 'image/jpeg', purpose: 'any maskable' }
+    ]
   };
   const mBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
   document.getElementById('pwa-manifest').href = URL.createObjectURL(mBlob);
-  if(LOGO_SRC) {
-    document.getElementById('apple-icon').href = LOGO_SRC;
-    // iOS splash screen — navy background
-    const splashEl = document.getElementById('apple-splash');
-    if(splashEl) splashEl.href = LOGO_SRC;
-  }
+  if(LOGO_SRC) document.getElementById('apple-icon').href = LOGO_SRC;
 
   // ── 2. Helpers ───────────────────────────────────────────────
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
@@ -4043,28 +3969,18 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
           <div style="color:rgba(255,255,255,.75);font-size:13px;line-height:1.55">
             Tap the <strong style="color:#D4AA5A">Share</strong> button
             <span style="display:inline-block;background:rgba(255,255,255,.15);border-radius:5px;
-                          padding:1px 7px;font-size:13px;color:#fff;margin:0 2px">
-              <svg viewBox="0 0 24 24" width="14" height="14" stroke="#D4AA5A" fill="none" stroke-width="2" style="vertical-align:middle"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
-            </span>
-            at the <strong style="color:#D4AA5A">bottom</strong> of Safari
+                          padding:1px 7px;font-size:13px;color:#fff;margin:0 2px">&#11014;&#65038;</span>
+            at the bottom of Safari
           </div>
         </div>
 
         <!-- Step 2 -->
         <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;
-                    display:flex;align-items:flex-start;gap:12px;margin-bottom:8px">
+                    display:flex;align-items:flex-start;gap:12px">
           <div style="font-size:18px;flex-shrink:0;line-height:1.2">2️⃣</div>
           <div style="color:rgba(255,255,255,.75);font-size:13px;line-height:1.55">
-            Scroll down and tap <strong style="color:#D4AA5A">"Add to Home Screen"</strong>
-          </div>
-        </div>
-
-        <!-- Step 3 -->
-        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;
-                    display:flex;align-items:flex-start;gap:12px">
-          <div style="font-size:18px;flex-shrink:0;line-height:1.2">3️⃣</div>
-          <div style="color:rgba(255,255,255,.75);font-size:13px;line-height:1.55">
-            Tap <strong style="color:#D4AA5A">Add</strong> in the top right — done! 🎉
+            Tap <strong style="color:#D4AA5A">"Add to Home Screen"</strong>
+            then tap <strong style="color:#D4AA5A">Add</strong>
           </div>
         </div>`;
 
