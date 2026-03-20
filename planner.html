@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<script src="capacitor.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>GWB Financial Planner</title>
@@ -17,6 +18,19 @@
 <meta name="msapplication-tap-highlight" content="no">
 <link rel="manifest" id="pwa-manifest">
 <link rel="apple-touch-icon" id="apple-icon">
+<link rel="apple-touch-startup-image" id="apple-splash">
+<style>
+  * { touch-action: manipulation; }
+  html { -webkit-text-size-adjust: 100%; }
+  .pg, .adv-pg { -webkit-overflow-scrolling: touch; }
+  .mob-nav { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .ain, .fin, .fse { font-size: 16px !important; }
+  .ni { font-size: 16px !important; }
+  @media (min-width: 420px) {
+    .ain, .fin, .fse { font-size: 14px !important; }
+    .ni { font-size: 13px !important; }
+  }
+</style>
 
 <!-- Safe area insets for iPhone notch / Android nav bar -->
 <style>
@@ -60,7 +74,7 @@ button{cursor:pointer;transition:all .15s}
 .aw-topline{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent 0%,var(--gold) 40%,var(--gold-l) 60%,transparent 100%)}
 .ac{background:rgba(255,255,255,.97);backdrop-filter:blur(20px);border-radius:var(--r-xl);padding:48px 44px;width:100%;max-width:420px;box-shadow:var(--shadow-lg);border:1px solid rgba(255,255,255,.3)}
 .alogo{text-align:center;margin-bottom:32px}
-.alogo img{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto}
+.alogo img{width:76px;height:76px;object-fit:contain;display:block;margin:0 auto;background:#fff;border-radius:8px;}
 .alogo-s{font-size:10px;letter-spacing:.2em;color:var(--mg);text-transform:uppercase;font-family:var(--sans);margin-top:10px;font-weight:500}
 .adiv{width:32px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:14px auto}
 .alogo-p{font-size:11px;letter-spacing:.12em;color:var(--mg);text-transform:uppercase;font-family:var(--sans);font-weight:500}
@@ -507,15 +521,60 @@ button{cursor:pointer;transition:all .15s}
   /* Recurring rows */
   .rec-row{flex-wrap:wrap!important;gap:6px!important;}
 }
+/* ══════════════════════════════════
+   LANDSCAPE MODE
+   ══════════════════════════════════ */
+@media (orientation: landscape) and (max-height: 500px) {
+  /* Auth screen — side by side layout */
+  .aw { align-items: flex-start; padding: 10px 16px; }
+  .ac { padding: 16px 20px; display: flex; flex-direction: row;
+        align-items: center; gap: 24px; max-width: 700px; }
+  .alogo { margin-bottom: 0; flex-shrink: 0; }
+  .alogo img { width: 48px; height: 48px; }
+  .alogo-s, .alogo-p, .adiv { display: none; }
+  .atitle { font-size: 16px; margin-bottom: 12px; }
+  .fld { margin-bottom: 10px; }
+  .ain { padding: 8px 12px; font-size: 13px; }
+  .gbtn { padding: 10px; margin-top: 4px; }
+
+  /* Page — reduce padding, allow scroll */
+  .pg { padding: 8px 10px 70px; }
+  .adv-pg { padding: 8px 10px 70px; }
+
+  /* Summary cards — single row in landscape */
+  .sg { grid-template-columns: repeat(3,1fr) !important; gap: 8px; }
+  .sg .sc:last-child { grid-column: span 1 !important; }
+  .sc { padding: 8px 10px; }
+  .scv { font-size: 14px !important; }
+  .scl { font-size: 8px; }
+
+  /* Page header */
+  .ph { margin-bottom: 8px; }
+  .ptitle { font-size: 15px !important; }
+
+  /* Bottom nav — stays at bottom, compact */
+  .mob-nav { height: 48px; }
+  .mob-tab svg { width: 18px; height: 18px; }
+  .mob-tab span { font-size: 8px; }
+
+  /* Sections */
+  .sec { margin-bottom: 6px; }
+  .sh { padding: 8px 12px; }
+
+  /* Advisor stats */
+  .adv-stats { grid-template-columns: repeat(4,1fr) !important; }
+}
 
 </style>
+<script src="capacitor-init.js"></script>
 </head>
 <body>
 <div id="app"></div>
 <div class="toast" id="toast"></div>
 
+<script src="supabase.js"></script>
 <script type="module">
-import{createClient}from'https://esm.sh/@supabase/supabase-js@2';
+const{createClient}=supabase;
 
 // ── Logo & intake form loaded from global scope ──
 const LOGO = "data:image/jpeg;base64,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";
@@ -780,7 +839,7 @@ async function delTx(id){
 function mpk(){return`<div class="mp"><button class="mpb" id="mpv">‹</button><span class="mpl">${MO[S.month]} ${S.year}</span><button class="mpb" id="mnx">›</button></div>`;}
 const logoImg=(sz)=>`<img src="${LOGO}" alt="GWB" style="width:${sz}px;height:${sz}px;object-fit:contain;display:block">`;
 
-function renderAuth(){return`<div class="aw"><div class="aw-topline"></div><div class="ac"><div class="alogo">${logoImg(88)}<div class="alogo-s">Generational Wealth Builders</div><div class="adiv"></div><div class="alogo-p">Monthly Financial Planner</div></div><h2 class="atitle">${S.am==='login'?'Welcome Back':'Create Your Account'}</h2>${S.aerr?`<div class="aerr">${S.aerr}</div>`:''} ${S.am==='signup'?`<div class="fld"><label class="lbl">Full Name</label><input class="ain" id="an" value="${S.an}" placeholder="Your full name"></div>`:''}<div class="fld"><label class="lbl">Email Address</label><input class="ain" id="ae" type="email" value="${S.ae}" placeholder="you@email.com"></div><div class="fld" style="margin-bottom:20px"><label class="lbl">Password</label><input class="ain" id="ap2" type="password" placeholder="••••••••"></div><button class="gbtn" id="asub">${S.al?'Please wait…':S.am==='login'?'Sign In':'Create Account'}</button><div style="text-align:center;margin-top:18px;font-size:13px;font-family:var(--sans);color:var(--mg)">${S.am==='login'?"Don't have an account? ":"Already have an account? "}<span style="color:var(--gold);cursor:pointer;font-weight:600" id="atog">${S.am==='login'?'Sign Up':'Sign In'}</span></div><div style="text-align:center;margin-top:22px;padding-top:16px;border-top:1px solid #F0EDE4;font-size:10px;color:var(--mg);font-family:var(--sans);letter-spacing:.05em">Your financial data is secured &amp; private.</div></div></div>`;}
+function renderAuth(){return`<div class="aw"><div class="aw-topline"></div><div class="ac"><div class="alogo">${logoImg(88)}<div class="alogo-s">Generational Wealth Builders</div><div class="adiv"></div><div class="alogo-p">Monthly Financial Planner</div></div><h2 class="atitle">${S.am==='login'?'Welcome Back':'Create Your Account'}</h2>${S.aerr?`<div class="aerr">${S.aerr}</div>`:''} ${S.am==='signup'?`<div class="fld"><label class="lbl">Full Name</label><input class="ain" id="an" value="${S.an}" placeholder="Your full name"></div>`:''}<div class="fld"><label class="lbl">Email Address</label><input class="ain" id="ae" type="email" value="${S.ae}" placeholder="you@email.com"></div><div class="fld" style="margin-bottom:20px"><label class="lbl">Password</label><div style="position:relative"><input class="ain" id="ap2" type="password" placeholder="••••••••" style="padding-right:44px"><button type="button" id="togglepw" onclick="gwbTogglePw()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mg);padding:4px;line-height:1;display:flex;align-items:center"><svg id="togglepw-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div></div><button class="gbtn" id="asub">${S.al?'Please wait…':S.am==='login'?'Sign In':'Create Account'}</button><div style="text-align:center;margin-top:18px;font-size:13px;font-family:var(--sans);color:var(--mg)">${S.am==='login'?"Don't have an account? ":"Already have an account? "}<span style="color:var(--gold);cursor:pointer;font-weight:600" id="atog">${S.am==='login'?'Sign Up':'Sign In'}</span></div>${S.am==='login'?`<div style="text-align:center;margin-top:12px"><span style="color:var(--gold);cursor:pointer;font-size:13px;font-family:var(--sans);font-weight:500" id="aforgot">Forgot Password?</span></div>`:''}<div style="text-align:center;margin-top:22px;padding-top:16px;border-top:1px solid #F0EDE4;font-size:10px;color:var(--mg);font-family:var(--sans);letter-spacing:.05em">Your financial data is secured &amp; private.</div></div></div>`;}
 
 function renderSec(cat){
   const items=S.bd[cat]||[];const isInc=cat==='income';
@@ -2130,32 +2189,36 @@ function renderMain(){
 
   // ── SVG icons for bottom nav ──
   const icons = {
-    budget:   '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
-    tracker:  '<svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
-    gap:      '<svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>',
-    report:   '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>',
-    more:     '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>',
+    budget:    '<svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>',
+    tracker:   '<svg viewBox="0 0 24 24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>',
+    recurring: '<svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
+    history:   '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
+    gap:       '<svg viewBox="0 0 24 24"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>',
+    report:    '<svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>',
+    more:      '<svg viewBox="0 0 24 24"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>',
   };
 
   // More-menu icons
   const moreIcons = {
-    tracker:    icons.tracker,
-    recurring:  '<svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>',
-    history:    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>',
-    debt:       '<svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
-    goals:      '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
-    retire:     '<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
-    appointment:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>',
+    tracker:     icons.tracker,
+    recurring:   icons.recurring,
+    history:     icons.history,
+    debt:        '<svg viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>',
+    goals:       '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+    retire:      '<svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
+    appointment: '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01"/></svg>',
+    gap:         icons.gap,
+    report:      icons.report,
   };
 
   // Tabs that appear in the "More" sheet (everything except the 4 primary tabs)
   const moreTabs = [
-    ['tracker','Expenses'],['recurring','Recurring'],['history','History'],
-    ['debt','Debt'],['goals','Goals'],['retire','Retirement'],['appointment','Book Advisor'],
+    ['debt','Debt'],['goals','Goals'],['retire','Retirement'],
+    ['appointment','Book Advisor'],['gap','Gap'],['report','Report'],
   ];
 
   // Primary bottom-nav tabs
-  const primaryTabs = ['budget','tracker','gap','report'];
+  const primaryTabs = ['budget','tracker','recurring','history'];
   const isMore = !primaryTabs.includes(S.tab);
 
   const bottomNav = `
@@ -2163,8 +2226,8 @@ function renderMain(){
     <div class="mob-nav-inner">
       <button class="mob-tab${S.tab==='budget'?' on':''}" data-t="budget">${icons.budget}<span>Budget</span></button>
       <button class="mob-tab${S.tab==='tracker'?' on':''}" data-t="tracker">${icons.tracker}<span>Expenses</span></button>
-      <button class="mob-tab${S.tab==='gap'?' on':''}" data-t="gap">${icons.gap}<span>Gap</span></button>
-      <button class="mob-tab${S.tab==='report'?' on':''}" data-t="report">${icons.report}<span>Report</span></button>
+      <button class="mob-tab${S.tab==='recurring'?' on':''}" data-t="recurring">${icons.recurring}<span>Recurring</span></button>
+      <button class="mob-tab${S.tab==='history'?' on':''}" data-t="history">${icons.history}<span>History</span></button>
       <button class="mob-tab${isMore?' on':''}" id="mob-more-btn">${icons.more}<span>More</span></button>
     </div>
   </nav>
@@ -2565,7 +2628,7 @@ function renderAdvisorAuth(){
       <p style="font-size:12px;color:var(--mg);text-align:center;margin-bottom:24px">This portal is restricted to your advisor account.</p>
       ${S.aerr?`<div class="aerr">${S.aerr}</div>`:''}
       <div class="fld"><label class="lbl">Email Address</label><input class="ain" id="ae" type="email" value="${S.ae}" placeholder="generationalwealthb@gmail.com"></div>
-      <div class="fld" style="margin-bottom:20px"><label class="lbl">Password</label><input class="ain" id="ap2" type="password" placeholder="••••••••"></div>
+      <div class="fld" style="margin-bottom:20px"><label class="lbl">Password</label><div style="position:relative"><input class="ain" id="ap2" type="password" placeholder="••••••••" style="padding-right:44px"><button type="button" id="togglepw" onclick="gwbTogglePw()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;color:var(--mg);padding:4px;line-height:1;display:flex;align-items:center"><svg id="togglepw-icon" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg></button></div></div>
       <button class="gbtn" id="asub">${S.al?'Signing in…':'Sign In to Advisor Portal'}</button>
     </div>
   </div>`;
@@ -2663,6 +2726,24 @@ function bind(){
     }catch(e){S.aerr=e.message;S.al=false;render();}
   });
   document.getElementById('atog')?.addEventListener('click',()=>{S.am=S.am==='login'?'signup':'login';S.aerr='';render();});
+  document.getElementById('aforgot')?.addEventListener('click',async()=>{
+    const email=document.getElementById('ae')?.value||'';
+    if(!email){S.aerr='Please enter your email address first.';render();return;}
+    try{
+      const{error}=await sb.auth.resetPasswordForEmail(email);
+      if(error)throw error;
+      S.aerr='';
+      // Show success message
+      S.aerr='';
+      const btn=document.getElementById('aforgot');
+      if(btn){
+        btn.textContent='✓ Reset link sent! Check your email inbox.';
+        btn.style.color='#12A150';
+        btn.style.cursor='default';
+        btn.style.fontWeight='600';
+      }
+    }catch(e){S.aerr=e.message;render();}
+  });
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{S.tab=b.dataset.t;render();}));
   document.getElementById('so')?.addEventListener('click',()=>{sb.auth.signOut();S.user=null;S.bd=null;S.tx=[];render();});
   document.getElementById('mpv')?.addEventListener('click',()=>{if(S.month===0){S.month=11;S.year--;}else S.month--;S.bd=null;loadB();loadT();});
@@ -3712,6 +3793,25 @@ async function submitForm() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 </script>
+
+<script>
+// Eye toggle — global function called by password show/hide button
+window.gwbTogglePw = function() {
+  var inp  = document.getElementById('ap2');
+  var icon = document.getElementById('togglepw-icon');
+  if (!inp || !icon) return;
+  var showing = inp.type === 'text';
+  inp.type = showing ? 'password' : 'text';
+  // Eye open (password visible) vs eye slashed (password hidden)
+  icon.innerHTML = showing
+    ? '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle>'
+    : '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line>';
+};
+</script>
+
+<script>
+if('serviceWorker' in navigator&&!window.Capacitor){window.addEventListener('load',function(){var c=["const CACHE='gwb-v1';","self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(['/'])).then(()=>self.skipWaiting()));});","self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(ks=>Promise.all(ks.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()));});","self.addEventListener('fetch',e=>{var u=new URL(e.request.url);if(u.hostname.includes('supabase.co')||u.hostname.includes('exchangerate-api.com'))return;if(u.origin===self.location.origin){e.respondWith(caches.match(e.request).then(ca=>ca||fetch(e.request).then(r=>{caches.open(CACHE).then(c=>c.put(e.request,r.clone()));return r;}).catch(()=>caches.match('/'))));}"]);";var b=new Blob([c.join('\n')],{type:'application/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b)).then(function(){console.log('GWB SW ready');}).catch(function(e){console.warn('SW:',e);});});}
+</script>
 </body>
 </html></script>
 <script>
@@ -3740,13 +3840,17 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
     lang: 'en',
     categories: ['finance','productivity'],
     icons: [
-      { src: LOGO_SRC, sizes: '192x192', type: 'image/jpeg', purpose: 'any maskable' },
-      { src: LOGO_SRC, sizes: '512x512', type: 'image/jpeg', purpose: 'any maskable' }
+      { src: LOGO_SRC, sizes: '192x192', type: 'image/jpeg', purpose: 'any' },
+      { src: LOGO_SRC, sizes: '512x512', type: 'image/jpeg', purpose: 'any' },
+      { src: LOGO_SRC, sizes: '192x192', type: 'image/jpeg', purpose: 'maskable' }
     ]
   };
   const mBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
   document.getElementById('pwa-manifest').href = URL.createObjectURL(mBlob);
-  if(LOGO_SRC) document.getElementById('apple-icon').href = LOGO_SRC;
+  if(LOGO_SRC) {
+    document.getElementById('apple-icon').href = LOGO_SRC;
+    var sp=document.getElementById('apple-splash'); if(sp) sp.href=LOGO_SRC;
+  }
 
   // ── 2. Helpers ───────────────────────────────────────────────
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
@@ -3880,24 +3984,24 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
         </div>
 
         <!-- Step 1 -->
-        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;
-                    display:flex;align-items:flex-start;gap:12px;margin-bottom:8px">
-          <div style="font-size:18px;flex-shrink:0;line-height:1.2">1️⃣</div>
+        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;display:flex;align-items:flex-start;gap:12px;margin-bottom:8px">
+          <div style="font-size:18px;flex-shrink:0;line-height:1.2">1⃣</div>
           <div style="color:rgba(255,255,255,.75);font-size:13px;line-height:1.55">
-            Tap the <strong style="color:#D4AA5A">Share</strong> button
-            <span style="display:inline-block;background:rgba(255,255,255,.15);border-radius:5px;
-                          padding:1px 7px;font-size:13px;color:#fff;margin:0 2px">&#11014;&#65038;</span>
-            at the bottom of Safari
+            Tap the <strong style="color:#D4AA5A">Share</strong> button <span style="display:inline-block;background:rgba(255,255,255,.15);border-radius:5px;padding:3px 8px;color:#D4AA5A;margin:0 2px"><svg viewBox="0 0 24 24" width="13" height="13" stroke="currentColor" fill="none" stroke-width="2.5" style="vertical-align:middle"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg></span> at the <strong style="color:#D4AA5A">bottom</strong> of Safari
           </div>
         </div>
-
         <!-- Step 2 -->
-        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;
-                    display:flex;align-items:flex-start;gap:12px">
-          <div style="font-size:18px;flex-shrink:0;line-height:1.2">2️⃣</div>
+        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;display:flex;align-items:flex-start;gap:12px;margin-bottom:8px">
+          <div style="font-size:18px;flex-shrink:0;line-height:1.2">2⃣</div>
           <div style="color:rgba(255,255,255,.75);font-size:13px;line-height:1.55">
-            Tap <strong style="color:#D4AA5A">"Add to Home Screen"</strong>
-            then tap <strong style="color:#D4AA5A">Add</strong>
+            Scroll down and tap <strong style="color:#D4AA5A">"Add to Home Screen"</strong>
+          </div>
+        </div>
+        <!-- Step 3 -->
+        <div style="background:rgba(255,255,255,.07);border-radius:12px;padding:13px 14px;display:flex;align-items:flex-start;gap:12px">
+          <div style="font-size:18px;flex-shrink:0;line-height:1.2">3⃣</div>
+          <div style="color:rgba(255,255,255,.75);font-size:13px;line-height:1.55">
+            Tap <strong style="color:#D4AA5A">Add</strong> in the top right — you're in! 🎉
           </div>
         </div>`;
 
