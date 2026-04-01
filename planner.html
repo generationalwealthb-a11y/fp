@@ -3823,8 +3823,17 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
 (function(){
 
   // ── 0. Service Worker registration ───────────────────────────
+  // iOS Safari: unregister any existing SW — it intercepts page loads and causes white screens.
+  // iOS install is always manual (Share → Add to Home Screen), so SW is not needed there.
+  var _iosUA = /iphone|ipad|ipod/i.test(navigator.userAgent);
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(function(){});
+    if (_iosUA) {
+      navigator.serviceWorker.getRegistrations().then(function(regs){
+        regs.forEach(function(r){ r.unregister(); });
+      });
+    } else {
+      navigator.serviceWorker.register('./sw.js').catch(function(){});
+    }
   }
 
   // ── 1. Manifest ──────────────────────────────────────────────
