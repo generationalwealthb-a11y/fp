@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<script src="capacitor.js"></script>
+<script src="capacitor.js" onerror="window.Capacitor=window.Capacitor||{}"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>GWB Financial Planner</title>
+<title>WealthPath</title>
 
 <!-- PWA META -->
-<meta name="application-name" content="GWB Planner">
+<meta name="application-name" content="WealthPath">
 <meta name="description" content="Your personal monthly financial planner by Generational Wealth Builders.">
 <meta name="theme-color" content="#0A1628">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="GWB Planner">
+<meta name="apple-mobile-web-app-title" content="WealthPath">
 <meta name="msapplication-TileColor" content="#0A1628">
 <meta name="msapplication-tap-highlight" content="no">
 <link rel="manifest" id="pwa-manifest">
@@ -46,7 +46,7 @@
   --shadow-lg:0 12px 40px rgba(0,0,0,.12),0 4px 12px rgba(0,0,0,.06);
 }
 
-html,body{font-family:var(--sans);background:var(--off);color:var(--dk);min-height:100vh;-webkit-font-smoothing:antialiased}
+html,body{font-family:var(--sans);background:#fff;color:var(--dk);min-height:100vh;-webkit-font-smoothing:antialiased}
 input,select,textarea,button{font-family:var(--sans);box-sizing:border-box}
 input:focus,select:focus,textarea:focus{border-color:var(--gold)!important;box-shadow:0 0 0 3px rgba(184,146,58,.12);outline:none}
 button{cursor:pointer;transition:all .15s}
@@ -556,10 +556,10 @@ button{cursor:pointer;transition:all .15s}
 <script src="capacitor-init.js"></script>
 </head>
 <body>
-<div id="app"></div>
+<div id="app" style="min-height:100vh;background:#fff"></div>
 <div class="toast" id="toast"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="supabase.js"></script>
 <script>
 const{createClient}=supabase;
 
@@ -868,6 +868,8 @@ function applyPaymentToLoan(itemName, amount){
     // Also update GC.debts to reflect new total
     GC.debts = LT.loans.reduce((s,l)=>s+l.balance, 0);
     gcSave();
+  } else {
+    toast('Loan "'+itemName+'" not found in Loan Tracker — balance not updated');
   }
 }
 
@@ -875,10 +877,8 @@ function applyPaymentToLoan(itemName, amount){
 // Called whenever loans change
 function syncLoansToGap(){
   const totalDebt = (LT.loans||[]).reduce((s,l)=>s+l.balance, 0);
-  if(totalDebt > 0){
-    GC.debts = totalDebt;
-    gcSave();
-  }
+  GC.debts = totalDebt;
+  gcSave();
 }
 
 // Connection 4: Budget savings → Goals progress
@@ -1126,7 +1126,7 @@ async function loadLoans(){
   render();
 }
 
-window.ltAdd = function(){
+window.ltAdd = async function(){
   const name = document.getElementById('lt-name')?.value.trim();
   const bal  = parseFloat(document.getElementById('lt-bal')?.value)||0;
   const rate = parseFloat(document.getElementById('lt-rate')?.value)||0;
@@ -1136,13 +1136,13 @@ window.ltAdd = function(){
   if(!LT.loans) LT.loans=[];
   LT.loans.push({id:LT.nextId++, name, balance:bal, rate, monthlyPayment:pay, type});
   ['lt-name','lt-bal','lt-rate','lt-pay'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
-  ltSave(); render();
+  syncLoansToBudget(); syncLoansToGap(); await ltSave(); render();
 };
 
-window.ltRemove = function(id){
+window.ltRemove = async function(id){
   LT.loans = LT.loans.filter(l=>l.id!==id);
   if(LT.showSched===id) LT.showSched=null;
-  syncLoansToBudget(); syncLoansToGap(); ltSave(); render();
+  syncLoansToBudget(); syncLoansToGap(); await ltSave(); render();
 };
 
 window.ltToggleSched = function(id){
@@ -2167,8 +2167,16 @@ function renderRecurring(){
 
 
 function renderAppt(){
-  const encoded = btoa(unescape(encodeURIComponent(INTAKE_HTML)));
-  return`<div class="ph"><div><div class="ptitle">Book a Session</div><div class="psub">Complete your Wealth Gap Assessment — your advisor will be notified immediately.</div></div></div><div class="iframe-wrap"><iframe src="data:text/html;base64,${encoded}" scrolling="yes" style="width:100%;border:none;display:block;min-height:900px" id="if" onload="this.style.height=(this.contentWindow.document.body.scrollHeight+60)+'px'"></iframe></div>`;
+  return`<div class="pg" style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;text-align:center;padding:40px 24px">
+    <div style="font-size:48px;margin-bottom:20px">📋</div>
+    <div class="ptitle" style="margin-bottom:10px">Book a Session</div>
+    <div class="psub" style="max-width:340px;margin-bottom:32px">Complete your Family Wealth Gap Assessment. Your advisor will be notified immediately and will prepare a strategy before your session.</div>
+    <a href="https://generationalwealthb-a11y.github.io/gwb/GWB_IntakeForm.html" target="_blank" rel="noopener"
+       style="display:inline-block;background:linear-gradient(135deg,var(--gold) 0%,var(--gold-l) 100%);color:#fff;border-radius:var(--r-sm);padding:14px 32px;font-size:13px;font-weight:700;letter-spacing:.04em;text-decoration:none;box-shadow:0 4px 14px rgba(184,146,58,.35)">
+      Open Assessment Form →
+    </a>
+    <div style="margin-top:16px;font-size:11px;color:var(--mg)">Opens in your browser · Takes about 8 minutes</div>
+  </div>`;
 }
 
 function renderMain(){
@@ -2477,7 +2485,7 @@ function renderAdvisor(){
       <div class="adv-bar-left">
         <div class="lm" style="width:28px;height:28px">${logoImg(28)}</div>
         <div>
-          <div class="adv-title" style="font-size:12px">GWB Planner</div>
+          <div class="adv-title" style="font-size:12px">WealthPath</div>
         </div>
         <span class="adv-badge" style="font-size:7px;padding:2px 6px">Advisor</span>
       </div>
@@ -2752,8 +2760,8 @@ function bind(){
       clearTimeout(saveTimer);saveB();
     });
   });
-  document.querySelectorAll('.db[data-dc]').forEach(b=>b.addEventListener('click',()=>{const c=b.dataset.dc,i=parseInt(b.dataset.di);S.bd[c].splice(i,1);saveB();}));
-  document.querySelectorAll('.addb[data-ac]').forEach(b=>b.addEventListener('click',()=>{const c=b.dataset.ac;const n=prompt('New item name for '+CL[c]+':');if(!n)return;S.bd[c].push({name:n,budgeted:0});saveB();}));
+  document.querySelectorAll('.db[data-dc]').forEach(b=>b.addEventListener('click',()=>{const c=b.dataset.dc,i=parseInt(b.dataset.di);if(!S.bd||!S.bd[c]||!Array.isArray(S.bd[c])||isNaN(i))return;S.bd[c].splice(i,1);saveB();}));
+  document.querySelectorAll('.addb[data-ac]').forEach(b=>b.addEventListener('click',()=>{const c=b.dataset.ac;const n=prompt('New item name for '+CL[c]+':');if(!n)return;if(!S.bd[c])S.bd[c]=[];S.bd[c].push({name:n,budgeted:0});saveB();}));
   document.getElementById('opm')?.addEventListener('click',()=>{
     S.modal=true;
     // Reset form to clean state every time modal opens
@@ -2868,6 +2876,9 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
+// Show login screen immediately — don't wait for network
+render();
+
 // Initial page load — getSession is the source of truth
 sb.auth.getSession().then(({data, error}) => {
   _sessionReady = true; // now onAuthStateChange can handle new sign-ins
@@ -2880,26 +2891,32 @@ sb.auth.getSession().then(({data, error}) => {
 });
 
 // ── Save on page hide/close ────────────────────────────────────
+// Helper: use sendBeacon so the request survives page unload
+function _beaconSave(){
+  if(!S.user||!S.bd) return;
+  clearTimeout(saveTimer);
+  const url=`https://tkhhzubopefzanezqzss.supabase.co/rest/v1/budgets`;
+  const payload=JSON.stringify([{user_id:S.user.id,month_key:mk(),categories:S.bd,updated_at:new Date().toISOString()}]);
+  // sendBeacon is fire-and-forget but guaranteed to complete even after page close
+  if(navigator.sendBeacon){
+    const blob=new Blob([payload],{type:'application/json'});
+    navigator.sendBeacon(url,blob);
+  }
+  // Also attempt the normal async path — on visibilitychange the page is still alive
+  sb.from('budgets').upsert(
+    {user_id:S.user.id,month_key:mk(),categories:S.bd,updated_at:new Date().toISOString()},
+    {onConflict:'user_id,month_key'}
+  );
+}
+
 // visibilitychange fires on mobile when switching apps (most reliable)
 document.addEventListener('visibilitychange', () => {
-  if(document.visibilityState === 'hidden' && S.user && S.bd){
-    clearTimeout(saveTimer);
-    sb.from('budgets').upsert(
-      {user_id:S.user.id, month_key:mk(), categories:S.bd, updated_at:new Date().toISOString()},
-      {onConflict:'user_id,month_key'}
-    );
-  }
+  if(document.visibilityState === 'hidden' && S.user && S.bd) _beaconSave();
 });
 
 // beforeunload fires on desktop refresh/close
 window.addEventListener('beforeunload', () => {
-  if(S.user && S.bd){
-    clearTimeout(saveTimer);
-    sb.from('budgets').upsert(
-      {user_id:S.user.id, month_key:mk(), categories:S.bd, updated_at:new Date().toISOString()},
-      {onConflict:'user_id,month_key'}
-    );
-  }
+  if(S.user && S.bd) _beaconSave();
 });
 </script>
 
@@ -3805,14 +3822,22 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
 <script>
 (function(){
 
+  // ── 0. Service Worker registration ───────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(function(){});
+  }
+
   // ── 1. Manifest ──────────────────────────────────────────────
   const PAGE_URL  = window.location.href.split('?')[0].split('#')[0];
-  const PAGE_PATH = window.location.pathname;
-  const LOGO_SRC  = document.querySelector('.lm img')?.src || '';
+  const PAGE_PATH = window.location.pathname || '/';
+  // Use static icon files (data: URIs are not accepted by Chrome's install criteria)
+  const BASE      = PAGE_URL.replace(/\/[^/]*$/, '/');
+  const ICON_192  = BASE + 'icon-192.jpg';
+  const ICON_512  = BASE + 'icon-512.jpg';
 
   const manifest = {
-    name: 'GWB Financial Planner',
-    short_name: 'GWB Planner',
+    name: 'WealthPath',
+    short_name: 'WealthPath',
     description: 'Monthly financial planner by Generational Wealth Builders',
     start_url: PAGE_URL,
     scope: PAGE_PATH,
@@ -3823,13 +3848,13 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
     lang: 'en',
     categories: ['finance','productivity'],
     icons: [
-      { src: LOGO_SRC, sizes: '192x192', type: 'image/jpeg', purpose: 'any maskable' },
-      { src: LOGO_SRC, sizes: '512x512', type: 'image/jpeg', purpose: 'any maskable' }
+      { src: ICON_192, sizes: '192x192', type: 'image/jpeg', purpose: 'any maskable' },
+      { src: ICON_512, sizes: '512x512', type: 'image/jpeg', purpose: 'any maskable' }
     ]
   };
   const mBlob = new Blob([JSON.stringify(manifest)], {type:'application/manifest+json'});
   document.getElementById('pwa-manifest').href = URL.createObjectURL(mBlob);
-  if(LOGO_SRC) document.getElementById('apple-icon').href = LOGO_SRC;
+  document.getElementById('apple-icon').href = ICON_192;
 
   // ── 2. Helpers ───────────────────────────────────────────────
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches
@@ -3881,7 +3906,7 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
       <style>@keyframes gwbSlideUp{from{transform:translateY(100%);opacity:0}to{transform:translateY(0);opacity:1}}</style>
       ${iconHTML}
       <div style="flex:1;min-width:0">
-        <div style="color:#fff;font-size:13.5px;font-weight:700;line-height:1.2">Install GWB Planner</div>
+        <div style="color:#fff;font-size:13.5px;font-weight:700;line-height:1.2">Install WealthPath</div>
         <div style="color:rgba(255,255,255,.5);font-size:11.5px;margin-top:2px;line-height:1.3">Add to home screen for one-tap access</div>
       </div>
       <button id="gwb-b-no"
@@ -3951,7 +3976,7 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
           <div style="display:flex;align-items:center;gap:10px">
             ${iconHTML}
             <div>
-              <div style="color:#fff;font-size:15px;font-weight:700">Install GWB Planner</div>
+              <div style="color:#fff;font-size:15px;font-weight:700">Install WealthPath</div>
               <div style="color:rgba(255,255,255,.4);font-size:11.5px;margin-top:2px">Save to your home screen</div>
             </div>
           </div>
