@@ -1,24 +1,10 @@
-/* WealthPath Service Worker — Android/Chrome PWA install support only */
-const CACHE = 'wealthpath-v1';
+/* WealthPath Service Worker
+   Minimal — exists only to satisfy PWA installability on Android/Chrome.
+   Does NOT intercept any requests so it cannot cause white screens. */
 
-self.addEventListener('install', e => {
-  e.waitUntil(Promise.resolve());
-});
-
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
-  );
-});
-
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
-  if (!e.request.url.startsWith('http')) return;
-  if (e.request.mode === 'navigate') return; // never intercept HTML page navigation
-
-  e.respondWith(
-    caches.match(e.request).then(r => r || fetch(e.request))
-  );
-});
+self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('activate', e => e.waitUntil(
+  caches.keys().then(keys => Promise.all(keys.map(k => caches.delete(k))))
+    .then(() => self.clients.claim())
+));
+/* No fetch handler — all requests go directly to the network */
