@@ -1,6 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<!-- SW kill-switch: runs before anything else, unregisters any broken service worker then reloads once -->
+<script>
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.getRegistrations().then(function(regs){
+    if(regs.length > 0){
+      Promise.all(regs.map(function(r){ return r.unregister(); })).then(function(){
+        if(!sessionStorage.getItem('sw-cleared')){
+          sessionStorage.setItem('sw-cleared','1');
+          location.reload();
+        }
+      });
+    }
+  });
+}
+</script>
 <script src="capacitor.js" onerror="window.Capacitor=window.Capacitor||{}"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
@@ -3822,18 +3837,10 @@ const INTAKE_HTML = document.getElementById('intake-data').textContent.trim();
 <script>
 (function(){
 
-  // ── 0. Service Worker registration ───────────────────────────
-  // iOS Safari: unregister any existing SW — it intercepts page loads and causes white screens.
-  // iOS install is always manual (Share → Add to Home Screen), so SW is not needed there.
-  var _iosUA = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  if ('serviceWorker' in navigator) {
-    if (_iosUA) {
-      navigator.serviceWorker.getRegistrations().then(function(regs){
-        regs.forEach(function(r){ r.unregister(); });
-      });
-    } else {
-      navigator.serviceWorker.register('./sw.js').catch(function(){});
-    }
+  // ── 0. Service Worker registration (Android/Chrome only) ─────
+  var _ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  if (!_ios && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').catch(function(){});
   }
 
   // ── 1. Manifest ──────────────────────────────────────────────
