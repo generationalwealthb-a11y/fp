@@ -36,7 +36,20 @@ if('serviceWorker' in navigator){
 
 <!-- Safe area insets for iPhone notch / Android nav bar -->
 <style>
-  body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+/* ── Capacitor / Android WebView compositing optimizations ── */
+/* Prevent white flash on navigation in Capacitor APK */
+html { background: #0A1628; }
+body { background: #F4F5F8; -webkit-overflow-scrolling: touch; overscroll-behavior: none; }
+#app { min-height: 100vh; background: #F4F5F8; }
+/* Prevent text selection on tap (reduces accidental long-press menus in Capacitor) */
+.mob-tab, .tab, .tool-card, .gbtn, .sh, .hc, .bcat-card {
+  -webkit-user-select: none;
+  user-select: none;
+}
+/* Ensure fixed elements don't shift on keyboard open in Android */
+.tb { -webkit-transform: translate3d(0,0,0); transform: translate3d(0,0,0); }
+
+body { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
   .tb  { padding-top: max(0px, env(safe-area-inset-top)); height: calc(64px + env(safe-area-inset-top)); }
   .adv-bar { padding-top: max(0px, env(safe-area-inset-top)); height: calc(64px + env(safe-area-inset-top)); }
 </style>
@@ -418,8 +431,8 @@ html.dark .skel{background:linear-gradient(90deg,#1A2336 25%,#243252 50%,#1A2336
    ════════════════════════════════ */
 @media(max-width:768px){
   .tabs{display:none!important}
-  /* Show the persistent body-level nav; suppress any in-app nav copy */
-  #gwb-fixed-nav{display:block !important}
+  /* Show the persistent body-level nav only when authenticated (auth-visible class added by JS) */
+  #gwb-fixed-nav.auth-visible{display:block !important}
   .mob-nav:not(#gwb-fixed-nav){display:none !important}
 
   /* Topbar */
@@ -849,12 +862,12 @@ html.dark .mob-more-item span{color:#E2E8F0}
 body { background:#F4F5F8; }
 #app { background:#F4F5F8 !important; }
 
-/* ── Tab content fade-in on every render ── */
+/* ── Tab content fade-in on tab navigation only ── */
 @keyframes pgFadeIn {
   from { opacity:0; transform:translateY(5px); }
   to   { opacity:1; transform:translateY(0); }
 }
-.pg { animation:pgFadeIn .2s cubic-bezier(.4,0,.2,1); }
+.pg.animate-entry { animation:pgFadeIn .2s cubic-bezier(.4,0,.2,1); }
 
 /* ── Topbar. deeper glass ── */
 .tb {
@@ -2048,6 +2061,24 @@ function mk(){return S.year+'-'+String(S.month+1).padStart(2,'0');}
 // Safe global tab navigation. use this instead of querySelector('[data-t=X]').click()
 window.gwbNav=function(tab){S.tab=tab;render();};
 
+// Opens the BookAdvisor intake form.
+// On Capacitor APK: uses the Browser plugin so the link opens in the system browser (not a stuck WebView).
+// On web/PWA: falls back to window.open with _blank.
+const GWB_BOOKING_URL = 'https://gwb-intakeform.vercel.app';
+window.gwbOpenBooking = async function(){
+  const Browser = window.Capacitor?.Plugins?.Browser;
+  if(Browser){
+    try{
+      await Browser.open({ url: GWB_BOOKING_URL, windowName: '_blank', presentationStyle: 'popover' });
+      return;
+    }catch(e){
+      console.warn('Capacitor Browser.open failed, falling back:', e);
+    }
+  }
+  // Web / PWA fallback
+  window.open(GWB_BOOKING_URL, '_blank', 'noopener,noreferrer');
+};
+
 // ── Inline SVG icon set — used throughout in place of emoji ────
 const IC = {
   // Tiny status icons (12px, inline)
@@ -2371,7 +2402,7 @@ async function saveB(){
     checkSavingsMilestones();
     const {rem, inc} = tots();
     if(rem === 0 && inc > 0){
-      toast('Every Pula assigned — budget complete!');
+      toast('Every Pula assigned. Budget complete!');
     } else {
       toast('Saved');
     }
@@ -3087,7 +3118,7 @@ function renderGap(){
     return `<div style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:6px;padding:10px 14px;margin-bottom:18px;display:flex;align-items:flex-start;gap:8px">
       <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="#D97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       <span style="font-size:11px;color:#92400E;font-family:var(--sans);line-height:1.6">
-        <strong>These figures were last updated ${daysSince} days ago.</strong> Life changes — income, debts, savings, and dependents. Review and update your numbers below to keep your protection plan accurate.
+        <strong>These figures were last updated ${daysSince} days ago.</strong> Life changes: income, debts, savings, and dependents. Review and update your numbers below to keep your protection plan accurate.
       </span>
     </div>`;
   })()}
@@ -3114,8 +3145,8 @@ function renderGap(){
       ${gcInput('savings','Total Savings & Investments (P)','Emergency fund + investments + cash')}
       ${(LT.loans&&LT.loans.length>0)?`<div><label style='display:block;font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--mg);font-family:var(--sans);margin-bottom:5px'>Total Outstanding Debts (P)</label><div style='padding:10px 12px;background:#FAFAF8;border:1px solid #E0DDD5;border-radius:2px;font-size:14px;font-family:var(--sans);color:var(--navy);font-weight:600'>${fmt(GC.debts||0)}</div><div style='font-size:10px;color:#16A34A;font-family:var(--sans);margin-top:3px'>${IC.ok} Auto-pulled from Loan Tracker</div></div>`:gcInput('debts','Total Outstanding Debts (P)','Home loan + car + personal loans')}
       ${gcInput('cover','Existing Life Cover / Sum Assured (P)','Total life policy payout if you passed away today. Enter 0 if none')}
-      ${gcInput('funeralCover','Funeral Cover / Burial Society Payout (P)','Total funeral cover payout — AVBOB, Doves, burial society, etc. Enter 0 if none')}
-      ${gcInput('retirementIncome','Other Monthly Income (P)','Pension, rental, investments — income that continues after you stop working')}
+      ${gcInput('funeralCover','Funeral Cover / Burial Society Payout (P)','Total funeral cover payout (AVBOB, Doves, burial society, etc). Enter 0 if none')}
+      ${gcInput('retirementIncome','Other Monthly Income (P)','Pension, rental, investments: income that continues after you stop working')}
       ${gcInput('deps','Number of Dependents','Children + parents who rely on your income')}
       ${gcInput('years','Years Family Must Be Covered','Until youngest dependent is independent',true)}
     </div>
@@ -3300,10 +3331,13 @@ function calcSimResultHTML(loanId){
   if(!loan) return '';
   const extra = parseFloat((LT.simExtra&&LT.simExtra[loanId])||0)||0;
   if(extra<=0) return `<div style="font-size:12px;color:var(--mg);padding:4px 0">Enter an extra monthly amount above to see the impact.</div>`;
-  const sim = calcLoan(loan.balance, loan.rate, loan.monthlyPayment + extra);
-  if(sim.error) return `<div style="font-size:12px;color:#DC2626">${sim.error}</div>`;
-  const monthsSaved = Math.max(0, loan.months - sim.months);
-  const interestSaved = Math.max(0, loan.totalInterest - sim.totalInterest);
+  // Compute baseline (without extra) here — LT.loans does not store totalInterest/months
+  const base = calcLoan(loan.balance, loan.rate, loan.monthlyPayment);
+  const sim  = calcLoan(loan.balance, loan.rate, loan.monthlyPayment + extra);
+  if(base.error) return `<div style="font-size:12px;color:#DC2626">${base.error}</div>`;
+  if(sim.error)  return `<div style="font-size:12px;color:#DC2626">${sim.error}</div>`;
+  const monthsSaved   = Math.max(0, base.months - sim.months);
+  const interestSaved = Math.max(0, base.totalInterest - sim.totalInterest);
   return `
   <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
     <div style="background:#fff;border-radius:6px;padding:12px;border:1px solid #E8E5DC;text-align:center">
@@ -3441,7 +3475,7 @@ function renderDebt(){
       </div>
       ${LT.showSim===loan.id&&!loan.error&&loan.months>0?`
       <div style="background:#F8F7F4;border-top:1px solid #F0EDE4;padding:16px 20px">
-        <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--mg);font-family:var(--sans);margin-bottom:12px">Extra Payment Simulator — ${safeText(loan.name)}</div>
+        <div style="font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--mg);font-family:var(--sans);margin-bottom:12px">Extra Payment Simulator: ${safeText(loan.name)}</div>
         <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px">
           <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:200px">
             <label style="font-size:12px;color:var(--mid);white-space:nowrap">Extra per month:</label>
@@ -3561,8 +3595,8 @@ function renderDebt(){
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#1E40AF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
       <div style="font-size:12px;color:#1E40AF;line-height:1.65">
         <strong>How loan payments reduce your balance:</strong><br>
-        Step 1 — Add your loan here (once only).<br>
-        Step 2 — Each time you make a payment, log it in the <strong>Expense Tracker</strong> under the <strong>Loan Repayments</strong> category, matching the loan name exactly. WealthPath will automatically reduce the balance shown here.
+        Step 1: Add your loan here (once only).<br>
+        Step 2: Each time you make a payment, log it in the <strong>Expense Tracker</strong> under the <strong>Loan Repayments</strong> category, matching the loan name exactly. WealthPath will automatically reduce the balance shown here.
       </div>
     </div>`:''}
     ${loans.length>0?`
@@ -4431,7 +4465,7 @@ function renderScore(){
       ${c.tip?`<div style="font-size:10px;color:var(--mg);margin-top:4px;line-height:1.5">${IC.bulb} ${c.tip}</div>`:''}
     </div>`;
   };
-  const gradeMsg=HS.grade==='A'?'Outstanding financial discipline — you are in the top tier.':HS.grade==='B'?'Strong habits with room to push higher.':HS.grade==='C'?'Solid foundation — focus on the weak areas below.':HS.grade==='D'?'Key areas need attention. Pick the highest-impact fix and start today.':'Urgent action needed across multiple financial areas.';
+  const gradeMsg=HS.grade==='A'?'Outstanding financial discipline. You are in the top tier.':HS.grade==='B'?'Strong habits with room to push higher.':HS.grade==='C'?'Solid foundation. Focus on the weak areas below.':HS.grade==='D'?'Key areas need attention. Pick the highest-impact fix and start today.':'Urgent action needed across multiple financial areas.';
   return`
   <div class="ph">
     <div><div class="ptitle">Financial Health Score</div><div class="psub">A composite rating across 6 key financial dimensions. Updates when you save your budget.</div></div>
@@ -4548,7 +4582,7 @@ function renderInvestments(){
         ${p.costBasis>0?`<div style="font-size:10px;color:var(--mg);margin-top:2px">Cost: ${fmt(p.costBasis)}</div>`:''}
       </div>
       <div style="text-align:right">
-        ${retPct!==null?`<div style="font-size:13px;font-weight:700;color:${isPos?'#16A34A':'#DC2626'}">${isPos?'+':''}${retPct}%</div><div style="font-size:10px;color:${isPos?'#16A34A':'#DC2626'}">${isPos?'+':''}${fmt(p.currentValue-p.costBasis)}</div>`:'<div style="font-size:11px;color:var(--mg)">—</div>'}
+        ${retPct!==null?`<div style="font-size:13px;font-weight:700;color:${isPos?'#16A34A':'#DC2626'}">${isPos?'+':''}${retPct}%</div><div style="font-size:10px;color:${isPos?'#16A34A':'#DC2626'}">${isPos?'+':''}${fmt(p.currentValue-p.costBasis)}</div>`:'<div style="font-size:11px;color:var(--mg)">-</div>'}
       </div>
       <button class="db" onclick="ipRemove(${p.id})">×</button>
     </div>`;
@@ -4631,7 +4665,7 @@ function renderTaxReport(){
 
   return`
   <div class="ph">
-    <div><div class="ptitle">Tax Year Report</div><div class="psub">Annual income and expense summary — Botswana Tax Year (1 July – 30 June).</div></div>
+    <div><div class="ptitle">Tax Year Report</div><div class="psub">Annual income and expense summary. Botswana Tax Year (1 July to 30 June).</div></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
       <select onchange="S.selectedTaxYear=parseInt(this.value);render()" style="border:1.5px solid var(--border);border-radius:var(--r-sm);padding:7px 12px;font-size:12px;font-family:var(--sans);color:var(--navy);background:#fff;cursor:pointer;font-weight:600;outline:none">
         ${taxYears.map(y=>`<option value="${y}"${ty===y?' selected':''}>${y}/${y+1} Tax Year</option>`).join('')}
@@ -4679,7 +4713,7 @@ function renderTaxReport(){
       </div>
       <div style="background:#F8F7F4;border:1px solid #E8E5DC;border-radius:6px;padding:14px 16px;margin-bottom:12px">
         <div style="font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--mg);margin-bottom:6px">BURS Submission Note</div>
-        <div style="font-size:11px;color:var(--mg);line-height:1.7">Botswana's tax year runs <strong style="color:var(--mid)">1 July to 30 June</strong>. Personal income tax returns are due by <strong style="color:var(--mid)">30 September</strong> each year. This report is based on ${tyMonths.length} month(s) of WealthPath budget data. Reconcile with official payslips, bank statements, and BURS records before submitting. Retirement contributions and medical aid premiums may be tax-deductible — consult a registered tax practitioner.</div>
+        <div style="font-size:11px;color:var(--mg);line-height:1.7">Botswana's tax year runs <strong style="color:var(--mid)">1 July to 30 June</strong>. Personal income tax returns are due by <strong style="color:var(--mid)">30 September</strong> each year. This report is based on ${tyMonths.length} month(s) of WealthPath budget data. Reconcile with official payslips, bank statements, and BURS records before submitting. Retirement contributions and medical aid premiums may be tax-deductible. Consult a registered tax practitioner.</div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:9.5px;color:var(--mg);flex-wrap:wrap;gap:4px">
         <span>WealthPath &nbsp;·&nbsp; generationalwealthb@gmail.com</span>
@@ -4797,7 +4831,7 @@ async function autoPostRecurring(){
   }));
   const {error: recErr} = await sb.from('transactions').insert(rows);
   if(recErr){
-    toast('Auto-post failed — please log recurring expenses manually.');
+    toast('Auto-post failed. Please log recurring expenses manually.');
     console.error('autoPostRecurring insert error:', recErr);
     return; // do NOT mark as posted — allow retry next load
   }
@@ -4992,10 +5026,10 @@ function renderAppt(){
     <div style="width:72px;height:72px;background:linear-gradient(135deg,var(--gold-p),rgba(184,146,58,.18));border-radius:20px;display:flex;align-items:center;justify-content:center;margin:0 auto 24px;box-shadow:0 4px 20px rgba(184,146,58,.2)"><svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M8 14h.01M12 14h.01M16 14h.01M8 18h.01M12 18h.01"/></svg></div>
     <div class="ptitle" style="margin-bottom:10px">Book a Session</div>
     <div class="psub" style="max-width:340px;margin-bottom:32px">Complete your Family Wealth Gap Assessment. Your advisor will be notified immediately and will prepare a strategy before your session.</div>
-    <a href="https://generationalwealthb-a11y.github.io/gwb/GWB_IntakeForm.html" target="_blank" rel="noopener" class="appt-cta-btn">
+    <button class="appt-cta-btn" onclick="gwbOpenBooking()" type="button">
       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       Start Your Assessment
-    </a>
+    </button>
     <div style="margin-top:16px;font-size:11px;color:var(--mg)">Opens in your browser · Takes about 12 minutes</div>
   </div>`;
 }
@@ -5311,7 +5345,7 @@ function renderProfile(){
       <div class="profile-row-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
       <div>
         <div class="profile-row-label">Daily Reminders</div>
-        <div class="profile-row-sub">${remOn?'Enabled — daily expense nudge':'Tap to set up daily reminders'}</div>
+        <div class="profile-row-sub">${remOn?'Enabled. Daily expense nudge':'Tap to set up daily reminders'}</div>
       </div>
     </div>
     <div class="profile-row-right">
@@ -6099,7 +6133,20 @@ function showNotifPermissionDialog() {
   document.getElementById('notif-skip-btn').addEventListener('click', () => overlay.remove());
 }
 
+let _renderPending = false;
 function render(){
+  if(_renderPending) return; // coalesce rapid successive calls into one frame
+  _renderPending = true;
+  requestAnimationFrame(()=>{
+    _renderPending = false;
+    _renderSync();
+  });
+}
+
+function _renderSync(){
+  // Preserve scroll position across re-renders (prevents jump on Capacitor)
+  const scrollY = window.scrollY || document.documentElement.scrollTop;
+
   // Always sync the persistent nav state (survives DOM replacements)
   updatePersistentNav();
 
@@ -6135,6 +6182,12 @@ function render(){
     bind();
   }
   applyDark(document.documentElement.classList.contains('dark'));
+  // Restore scroll position for same-tab updates (e.g. modal open/close, filter changes)
+  // Don't restore on tab switches — those should scroll to top
+  if(scrollY > 0 && S.user && !S._tabChanged){
+    requestAnimationFrame(()=>window.scrollTo(0, scrollY));
+  }
+  S._tabChanged = false;
 }
 
 function bindAdvisorAuth(){
@@ -6164,9 +6217,12 @@ function bindAdvisor(){
     ADV.filter=b.dataset.af; render();
   }));
 
-  // Search
+  // Search — debounce render to avoid full DOM rebuild on every keystroke
+  let _advSearchTimer;
   document.getElementById('adv-search')?.addEventListener('input', e=>{
-    ADV.search=e.target.value; render();
+    ADV.search=e.target.value;
+    clearTimeout(_advSearchTimer);
+    _advSearchTimer = setTimeout(()=>render(), 180);
   });
 
   // Row click or View button → open modal
@@ -6211,8 +6267,11 @@ function updatePersistentNav(){
   });
 
   // Show/hide nav based on auth state + lock state
+  // Use class instead of inline style — inline style can be overridden by !important CSS rules on mobile
   const shouldShow = !!(S.user && !S.locked && !S.onb && !isAdvisor());
-  nav.style.display = shouldShow ? 'block' : 'none';
+  nav.classList.toggle('auth-visible', shouldShow);
+  // Also force-hide via inline style as a second layer of protection (belt AND suspenders)
+  nav.style.setProperty('display', shouldShow ? 'block' : 'none', 'important');
 }
 
 // One-time nav event binding — called ONCE at boot, survives all render() cycles
@@ -6223,6 +6282,7 @@ function updatePersistentNav(){
     const btn = e.target.closest('.mob-tab[data-t]');
     if(!btn) return;
     const t = btn.dataset.t;
+    S._tabChanged = true;
     S.tab = t; render();
     if(t==='history') loadH();
   });
@@ -6302,6 +6362,7 @@ function bind(){
   });
   document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
     const t=b.dataset.t;
+    S._tabChanged = true;
     S.tab=t;
     render();
     // Refresh history data whenever the user navigates to it
@@ -6411,13 +6472,13 @@ function bind(){
 
   // ── Mobile 5-tab fixed bottom nav ─────────────────────────
   document.querySelectorAll('.mob-nav .mob-tab[data-t]').forEach(b=>b.addEventListener('click',()=>{
-    const t=b.dataset.t; S.tab=t; render();
+    const t=b.dataset.t; S._tabChanged=true; S.tab=t; render();
     if(t==='history') loadH();
   }));
 
   // ── Tools hub. card navigation ────────────────────────────
   document.querySelectorAll('.tool-card[data-t]').forEach(b=>b.addEventListener('click',()=>{
-    const t=b.dataset.t; S.tab=t; render();
+    const t=b.dataset.t; S._tabChanged=true; S.tab=t; render();
     if(t==='history') loadH();
   }));
 
@@ -6670,11 +6731,13 @@ function mountCharts(){
 }
 
 function animateCounters(){
-  // Re-trigger CSS keyframe on every .scv by forcing a reflow
-  document.querySelectorAll('.sg .scv').forEach(el=>{
-    el.style.animation='none';
-    void el.offsetWidth;
-    el.style.animation='';
+  // Use RAF to avoid forced synchronous layout/reflow on Android WebView
+  requestAnimationFrame(()=>{
+    document.querySelectorAll('.sg .scv').forEach(el=>{
+      el.style.animation='none';
+      void el.offsetWidth; // intentional reflow — deferred to RAF to avoid main-thread blocking
+      el.style.animation='';
+    });
   });
 }
 
@@ -6746,8 +6809,8 @@ sb.auth.onAuthStateChange((event, session) => {
   }
 });
 
-// Show login screen immediately. don't wait for network
-render();
+// Show login screen immediately — bypass RAF queue for instant first paint
+_renderSync();
 
 // Initial page load. getSession is the source of truth
 sb.auth.getSession().then(({data, error}) => {
